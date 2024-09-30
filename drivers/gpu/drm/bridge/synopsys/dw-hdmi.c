@@ -197,6 +197,7 @@ struct dw_hdmi {
 	hdmi_codec_plugged_cb plugged_cb;
 	struct device *codec_dev;
 	enum drm_connector_status last_connector_result;
+	unsigned int hpd_inverted;
 };
 
 #define HDMI_IH_PHY_STAT0_RX_SENSE \
@@ -1689,8 +1690,14 @@ static void dw_hdmi_phy_disable(struct dw_hdmi *hdmi, void *data)
 enum drm_connector_status dw_hdmi_phy_read_hpd(struct dw_hdmi *hdmi,
 					       void *data)
 {
-	return hdmi_readb(hdmi, HDMI_PHY_STAT0) & HDMI_PHY_HPD ?
-		connector_status_connected : connector_status_disconnected;
+    /* Read the HDMI PHY HPD status */
+    bool hpd_status = hdmi_readb(hdmi, HDMI_PHY_STAT0) & HDMI_PHY_HPD;
+
+    /* Invert the HPD status if the hpd-inverted flag is set */
+    if (hdmi->hpd_inverted)
+        hpd_status = !hpd_status;
+
+    return hpd_status ? connector_status_connected : connector_status_disconnected;
 }
 EXPORT_SYMBOL_GPL(dw_hdmi_phy_read_hpd);
 
@@ -3376,6 +3383,8 @@ struct dw_hdmi *dw_hdmi_probe(struct platform_device *pdev,
 	ret = dw_hdmi_parse_dt(hdmi);
 	if (ret < 0)
 		return ERR_PTR(ret);
+
+	hdmi->hpd_inverted = of_property_read_bool(np, "hpd-inverted");
 
 	ddc_node = of_parse_phandle(np, "ddc-i2c-bus", 0);
 	if (ddc_node) {

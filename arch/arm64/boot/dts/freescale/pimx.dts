@@ -727,6 +727,7 @@
 
 &hdmi {
 	status = "okay";
+	hpd-inverted;
 };
 
 &hdmiphy {
