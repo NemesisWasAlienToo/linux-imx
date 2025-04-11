@@ -3117,8 +3117,14 @@ static irqreturn_t dw_hdmi_irq(int irq, void *dev_id)
 	 */
 	if (intr_stat &
 	    (HDMI_IH_PHY_STAT0_RX_SENSE | HDMI_IH_PHY_STAT0_HPD)) {
+
+		/* Get the HPD status, accounting for inversion */
+        bool hpd = (phy_stat & HDMI_PHY_HPD);
+        if (hdmi->hpd_inverted)
+            hpd = !hpd;
+
 		dw_hdmi_setup_rx_sense(hdmi,
-				       phy_stat & HDMI_PHY_HPD,
+				       hpd,
 				       phy_stat & HDMI_PHY_RX_SENSE);
 
 		if ((phy_stat & (HDMI_PHY_RX_SENSE | HDMI_PHY_HPD)) == 0) {
@@ -3127,11 +3133,10 @@ static irqreturn_t dw_hdmi_irq(int irq, void *dev_id)
 			mutex_unlock(&hdmi->cec_notifier_mutex);
 		}
 
-		if (phy_stat & HDMI_PHY_HPD)
-			status = connector_status_connected;
-
-		if (!(phy_stat & (HDMI_PHY_HPD | HDMI_PHY_RX_SENSE)))
-			status = connector_status_disconnected;
+		if (hpd)
+            status = connector_status_connected;
+        else if (!(phy_stat & HDMI_PHY_RX_SENSE))
+            status = connector_status_disconnected;
 	}
 
 	if (status != connector_status_unknown) {
